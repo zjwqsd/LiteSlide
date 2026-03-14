@@ -12,6 +12,7 @@ defineProps<{
     <div class="max-w-4xl mx-auto py-20 px-8">
       
       <template v-for="(slide, index) in slides" :key="index">
+        
         <h1 
           v-if="slide.type === 'cover'" 
           :id="'slide-' + index"
@@ -20,17 +21,25 @@ defineProps<{
           {{ slide.title }}
         </h1>
         
-        <h2 
-          v-else 
-          :id="'slide-' + index"
-          class="text-4xl font-bold mb-8 text-blue-600 dark:text-blue-300 border-b border-gray-200 dark:border-gray-800 pb-4 mt-20"
-        >
-          {{ slide.title }}
-        </h2>
-        
+        <template v-else>
+          <h2 
+            v-if="!slide.isContinuation"
+            :id="'slide-' + index"
+            class="text-4xl font-bold mb-8 text-blue-600 dark:text-blue-300 border-b border-gray-200 dark:border-gray-800 pb-4 mt-20"
+          >
+            {{ slide.title }}
+          </h2>
+          <hr 
+            v-else 
+            :id="'slide-' + index" 
+            class="my-16 border-t-2 border-dashed border-gray-200 dark:border-gray-800" 
+          />
+        </template>
+
         <div class="flex flex-col gap-2">
           <AstRenderer v-for="(el, idx) in slide.elements" :key="idx" :node="el" />
         </div>
+        
       </template>
 
       <div class="h-32 w-full flex items-end justify-center text-gray-400 dark:text-gray-600 font-mono text-sm">

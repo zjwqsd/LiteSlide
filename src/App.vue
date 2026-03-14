@@ -4,37 +4,36 @@ import { parseMarkdownToSlides, type SlideNode } from './core/parser';
 import SlideView from './components/SlideView.vue';
 import ArticleView from './components/ArticleView.vue';
 
-// 利用 Vite 魔法直接将外部 demo.md 读取为初始字符串
 import rawDemoMd from './demo.md?raw';
 
-// 核心状态
 const editableMarkdown = ref(rawDemoMd);
 const slides = ref<SlideNode[]>([]);
 const currentIndex = ref(0);
 
-// UI 控制面板状态
-const isEditing = ref(false); // 默认收起编辑器，沉浸展示
+const isEditing = ref(false);
 const viewMode = ref<'slide' | 'article'>('slide');
 const isDark = ref(true);
 
-// 注入主题状态给底层的代码高亮和样式系统
-provide('isDark', isDark);
+// 【核心新增】：配置你的图片服务器/CDN前缀
+// 比如 'https://cdn.boji108.com/assets'
+// 如果留空 ''，则依然走默认的本地 public 解析逻辑
+const myAssetPrefix = ''; 
 
-// 监听 Markdown 文本修改，实时触发重绘
+// 注入配置
+provide('isDark', isDark);
+provide('assetPrefix', myAssetPrefix);
+
 watch(editableMarkdown, (newMd) => {
   slides.value = parseMarkdownToSlides(newMd);
-  // 防止删除了某页导致当前页码越界
   if (currentIndex.value >= slides.value.length) {
     currentIndex.value = Math.max(0, slides.value.length - 1);
   }
 }, { immediate: true });
 
-// 【核心体验】：光标与视图的双向同步算法
 const syncPosition = (e: Event) => {
   const target = e.target as HTMLTextAreaElement;
   const textBeforeCursor = editableMarkdown.value.substring(0, target.selectionStart);
   
-  // 计算光标前面有几个一级或二级标题
   const headingMatches = textBeforeCursor.match(/^#{1,2}\s/gm);
   let targetIndex = headingMatches ? headingMatches.length - 1 : 0;
   targetIndex = Math.max(0, Math.min(targetIndex, slides.value.length - 1));
@@ -42,7 +41,6 @@ const syncPosition = (e: Event) => {
   if (currentIndex.value !== targetIndex) {
     currentIndex.value = targetIndex;
     
-    // 如果是文章模式，平滑滚动到对应锚点
     if (viewMode.value === 'article') {
       nextTick(() => {
         const el = document.getElementById(`slide-${targetIndex}`);
@@ -54,9 +52,7 @@ const syncPosition = (e: Event) => {
   }
 };
 
-// 全局快捷键调度中心
 const handleKeydown = (e: KeyboardEvent) => {
-  // 如果正在编辑器里打字，拦截翻页快捷键
   if (e.target instanceof HTMLTextAreaElement) {
     if (e.key === 'Escape') {
       isEditing.value = false;
@@ -69,7 +65,6 @@ const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === 'm' || e.key === 'M') { viewMode.value = viewMode.value === 'slide' ? 'article' : 'slide'; return; }
   if (e.key === 't' || e.key === 'T') { isDark.value = !isDark.value; return; }
 
-  // 幻灯片翻页
   if (viewMode.value === 'slide') {
     if (e.key === 'ArrowRight' || e.key === 'Space' || e.key === 'Enter') {
       if (currentIndex.value < slides.value.length - 1) currentIndex.value++;

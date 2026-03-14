@@ -7,10 +7,11 @@ import { codeToHtml } from 'shiki';
 const props = defineProps<{ node: any; }>();
 const highlightedCode = ref<string>('');
 
-// 【新增】：接收全局的主题状态
+// 接收全局状态
 const isDark = inject('isDark', ref(true));
+// 【新增】：接收全局注入的自定义资源前缀（默认留空）
+const assetPrefix = inject<string>('assetPrefix', '');
 
-// 【重构】：将渲染逻辑抽离，以便在主题切换时重新生成高亮
 const renderShiki = async () => {
   if (props.node.type === 'code') {
     const lang = props.node.lang || 'text';
@@ -26,7 +27,7 @@ const renderShiki = async () => {
 };
 
 onMounted(renderShiki);
-watch(isDark, renderShiki); // 主题变化时，代码块瞬间换装！
+watch(isDark, renderShiki);
 
 const isVideo = (url: string) => /\.(mp4|webm|ogg)$/i.test(url);
 
@@ -42,6 +43,33 @@ const getGridCols = (count: number) => {
   if (count === 2 || count === 4) return 2;
   if (count >= 3) return 3;
   return 1;
+};
+
+// 【核心进化】：支持 CDN/图床前缀的 URL 智能解析器
+const resolveUrl = (url: string) => {
+  if (!url) return '';
+  
+  // 1. 绝对路径或 Base64：直接放行
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  
+  // 2. 自定义图床/CDN 前缀优先：如果用户配置了前缀，自动拼接
+  if (assetPrefix) {
+    // 智能处理斜杠，防止拼接出双斜杠
+    const prefix = assetPrefix.endsWith('/') ? assetPrefix.slice(0, -1) : assetPrefix;
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${prefix}${path}`;
+  }
+  
+  // 3. 默认回退：Vite 的 public 目录解析规则 (兼容 GitHub Pages)
+  if (url.startsWith('/')) {
+    const base = import.meta.env.BASE_URL;
+    return base.endsWith('/') ? base + url.slice(1) : base + '/' + url.slice(1);
+  }
+  
+  // 4. 其他相对路径原样返回
+  return url;
 };
 </script>
 
@@ -75,8 +103,8 @@ const getGridCols = (count: number) => {
     </p>
   </template>
 
-  <video v-else-if="node.type === 'image' && isVideo(node.url)" :src="node.url" controls class="max-h-[65vh] w-auto max-w-full rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 mx-auto block"></video>
-  <img v-else-if="node.type === 'image' && !isVideo(node.url)" :src="node.url" class="max-h-[65vh] w-auto max-w-full object-contain rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 mx-auto block bg-gray-50 dark:bg-gray-800/30" />
+  <video v-else-if="node.type === 'image' && isVideo(node.url)" :src="resolveUrl(node.url)" controls class="max-h-[65vh] w-auto max-w-full rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 mx-auto block"></video>
+  <img v-else-if="node.type === 'image' && !isVideo(node.url)" :src="resolveUrl(node.url)" :alt="node.alt" :title="node.title" class="max-h-[65vh] w-auto max-w-full object-contain rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 mx-auto block bg-gray-50 dark:bg-gray-800/30" />
 
   <blockquote v-else-if="node.type === 'blockquote'" class="border-l-4 border-blue-500 pl-6 py-2 my-6 text-gray-600 dark:text-gray-400 italic bg-blue-50 dark:bg-gray-800/30 rounded-r-xl text-2xl">
     <AstRenderer v-for="(child, idx) in node.children" :key="idx" :node="child" />
@@ -94,7 +122,6 @@ const getGridCols = (count: number) => {
     <div v-if="node.lang" class="absolute top-2 right-4 text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider font-bold select-none">{{ node.lang }}</div>
     <div class="shiki-container text-[1.3rem] font-mono leading-snug [&>pre]:overflow-x-auto [&>pre]:bg-transparent! [&>pre]:pb-2" v-html="highlightedCode"></div>
   </div>
-
 </template>
 
 <style scoped>
