@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, provide } from 'vue';
+import { ref, watch, onMounted, onUnmounted, provide, nextTick } from 'vue';
 import { parseMarkdownToSlides, type SlideNode } from './core/parser';
 import SlideView from './components/SlideView.vue';
 import ArticleView from './components/ArticleView.vue';
@@ -40,7 +40,6 @@ const currentIndex = ref(0);
 const isEditing = ref(false);
 const viewMode = ref<'slide' | 'article'>('slide');
 
-// 【新增】：全局主题状态，并下发给所有子组件
 const isDark = ref(true);
 provide('isDark', isDark);
 
@@ -50,6 +49,33 @@ watch(editableMarkdown, (newMd) => {
     currentIndex.value = Math.max(0, slides.value.length - 1);
   }
 }, { immediate: true });
+
+// 【新增】：根据光标位置同步预览视图
+const syncPosition = (e: Event) => {
+  const target = e.target as HTMLTextAreaElement;
+  // 获取光标前的所有文本
+  const textBeforeCursor = editableMarkdown.value.substring(0, target.selectionStart);
+  
+  // 匹配光标前有多少个一级或二级标题
+  const headingMatches = textBeforeCursor.match(/^#{1,2}\s/gm);
+  let targetIndex = headingMatches ? headingMatches.length - 1 : 0;
+  targetIndex = Math.max(0, Math.min(targetIndex, slides.value.length - 1));
+
+  // 如果算出的页码和当前页码不同，触发同步
+  if (currentIndex.value !== targetIndex) {
+    currentIndex.value = targetIndex;
+    
+    // 如果是文章模式，找到对应的标题锚点并平滑滚动
+    if (viewMode.value === 'article') {
+      nextTick(() => {
+        const el = document.getElementById(`slide-${targetIndex}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    }
+  }
+};
 
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.target instanceof HTMLTextAreaElement) {
@@ -70,7 +96,6 @@ const handleKeydown = (e: KeyboardEvent) => {
     return;
   }
 
-  // 【新增】：按 T 切换主题
   if (e.key === 't' || e.key === 'T') {
     isDark.value = !isDark.value;
     return;
@@ -98,43 +123,33 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
           <span>临时编辑器</span>
           <span class="text-xs bg-blue-100 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400 px-2 py-1 rounded border border-blue-200 dark:border-blue-500/30">ESC 退出</span>
         </div>
+        
         <textarea 
           v-model="editableMarkdown"
+          @keyup="syncPosition"
+          @click="syncPosition"
+          @input="syncPosition"
           class="flex-1 w-full p-6 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-300 font-mono text-sm leading-relaxed outline-none resize-none focus:ring-inset focus:ring-1 focus:ring-blue-500/50 transition-colors"
           spellcheck="false"
         ></textarea>
       </div>
 
       <div class="flex-1 h-full flex items-center justify-center relative bg-gray-100 dark:bg-gray-950 overflow-hidden transition-colors">
-        
         <div v-if="viewMode === 'article'" class="w-full h-full relative">
           <ArticleView :slides="slides" />
         </div>
-
         <div v-else class="relative w-full h-full max-w-[1920px] max-h-[1080px] aspect-video bg-white dark:bg-gray-900 shadow-2xl overflow-hidden transition-colors">
           <Transition name="fade" mode="out-in">
             <SlideView v-if="slides.length > 0" :key="currentIndex" :slide="slides[currentIndex]" />
           </Transition>
         </div>
-
         <div class="absolute bottom-4 right-6 text-gray-600 dark:text-gray-400 font-mono flex gap-4 items-center z-40 bg-white/90 dark:bg-gray-900/80 px-3 py-1.5 rounded-lg backdrop-blur shadow-lg border border-gray-200 dark:border-gray-700/50 transition-colors">
-          <span class="text-xs">
-            <kbd class="bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-1 rounded border border-gray-300 dark:border-gray-700">T</kbd> 主题
-          </span>
-          <span class="text-xs">
-            <kbd class="bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-1 rounded border border-gray-300 dark:border-gray-700">M</kbd> 模式
-          </span>
-          <span class="text-xs" v-if="!isEditing">
-            <kbd class="bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-1 rounded border border-gray-300 dark:border-gray-700">E</kbd> 编辑
-          </span>
-          <span class="font-bold text-blue-600 dark:text-blue-400 border-l border-gray-300 dark:border-gray-700 pl-4">
-            {{ viewMode === 'slide' ? 'Slide' : 'Article' }}
-          </span>
-          <span v-if="viewMode === 'slide'" class="border-l border-gray-300 dark:border-gray-700 pl-4">
-            {{ currentIndex + 1 }} / {{ slides.length }}
-          </span>
+          <span class="text-xs"><kbd class="bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-1 rounded border border-gray-300 dark:border-gray-700">T</kbd> 主题</span>
+          <span class="text-xs"><kbd class="bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-1 rounded border border-gray-300 dark:border-gray-700">M</kbd> 模式</span>
+          <span class="text-xs" v-if="!isEditing"><kbd class="bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-1 rounded border border-gray-300 dark:border-gray-700">E</kbd> 编辑</span>
+          <span class="font-bold text-blue-600 dark:text-blue-400 border-l border-gray-300 dark:border-gray-700 pl-4">{{ viewMode === 'slide' ? 'Slide' : 'Article' }}</span>
+          <span v-if="viewMode === 'slide'" class="border-l border-gray-300 dark:border-gray-700 pl-4">{{ currentIndex + 1 }} / {{ slides.length }}</span>
         </div>
-
       </div>
     </div>
   </div>
