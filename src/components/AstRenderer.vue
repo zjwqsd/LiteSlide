@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, inject } from 'vue';
+import { ref, watch, onMounted, inject, type Ref } from 'vue';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { codeToHtml } from 'shiki';
@@ -10,7 +10,7 @@ const highlightedCode = ref<string>('');
 
 const isDark = inject('isDark', ref(true));
 // 【区别所在】：这里使用的是 currentDir，保护了你本地文件的相对路径功能！
-const currentDir = inject<string>('currentDir', '');
+const currentDir = inject<Ref<string>>('currentDir', ref(''));
 
 // 代码块与 Mermaid 图表智能分流器
 const renderBlock = async () => {
@@ -68,10 +68,10 @@ const resolveUrl = (url: string) => {
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
   if (url.startsWith('/')) return url; 
 
-  // 将相对路径与当前文件夹拼接
-  if (currentDir) {
+  // 2. 必须使用 currentDir.value 解包！
+  if (currentDir.value) {
     const cleanUrl = url.replace(/^\.\//, ''); // 去掉开头的 ./
-    return `/${currentDir}/${cleanUrl}`;
+    return `/${currentDir.value}/${cleanUrl}`;
   }
   return url;
 };
