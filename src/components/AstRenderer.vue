@@ -9,7 +9,7 @@ const highlightedCode = ref<string>('');
 
 // 接收全局状态
 const isDark = inject('isDark', ref(true));
-// 【新增】：接收全局注入的自定义资源前缀（默认留空）
+const currentDir = inject<string>('currentDir', '');
 const assetPrefix = inject<string>('assetPrefix', '');
 
 const renderShiki = async () => {
@@ -48,27 +48,14 @@ const getGridCols = (count: number) => {
 // 【核心进化】：支持 CDN/图床前缀的 URL 智能解析器
 const resolveUrl = (url: string) => {
   if (!url) return '';
-  
-  // 1. 绝对路径或 Base64：直接放行
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
-    return url;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  if (url.startsWith('/')) return url; 
+
+  // 将相对路径与当前文件夹拼接
+  if (currentDir) {
+    const cleanUrl = url.replace(/^\.\//, ''); // 去掉开头的 ./
+    return `/${currentDir}/${cleanUrl}`;
   }
-  
-  // 2. 自定义图床/CDN 前缀优先：如果用户配置了前缀，自动拼接
-  if (assetPrefix) {
-    // 智能处理斜杠，防止拼接出双斜杠
-    const prefix = assetPrefix.endsWith('/') ? assetPrefix.slice(0, -1) : assetPrefix;
-    const path = url.startsWith('/') ? url : `/${url}`;
-    return `${prefix}${path}`;
-  }
-  
-  // 3. 默认回退：Vite 的 public 目录解析规则 (兼容 GitHub Pages)
-  if (url.startsWith('/')) {
-    const base = import.meta.env.BASE_URL;
-    return base.endsWith('/') ? base + url.slice(1) : base + '/' + url.slice(1);
-  }
-  
-  // 4. 其他相对路径原样返回
   return url;
 };
 </script>
