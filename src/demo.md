@@ -43,3 +43,18 @@ function greet(name: string): string {
   // 在 github-light 和 tokyo-night 之间无缝热切！
   return `Hello, ${name}! Welcome to LiteSlide.`;
 }
+```
+
+## 5. 超长内容分发测试
+这一节我们要讲的内容非常多。首先这是第一页的引导语，我们在下面放置一张占位置的大图。
+
+![测试图](https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80)
+
+---
+
+这已经是 PPT 的第二页了！
+
+你会发现，在 Slide 模式下，这一页的顶部依然保留了“超长内容分发测试”的标题，保证了演讲的上下文不丢失。右边我们可以继续放代码或者别的图片。
+
+```javascript
+console.log("分页逻辑太爽了！");
